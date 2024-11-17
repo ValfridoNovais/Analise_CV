@@ -16,7 +16,7 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# CSS para ajustar a tabela
+# CSS para ajustar a tabela e caixas de entrada dinâmicas
 table_style = """
     <style>
     .custom-table {
@@ -34,6 +34,26 @@ table_style = """
     }
     .custom-table th {
         background-color: #f2f2f2;
+    }
+    .correct-input {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+        padding: 0.25rem;
+        font-size: 1rem;
+        width: 100%;
+        border-radius: 4px;
+        text-align: center;
+    }
+    .incorrect-input {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        padding: 0.25rem;
+        font-size: 1rem;
+        width: 100%;
+        border-radius: 4px;
+        text-align: center;
     }
     </style>
 """
@@ -57,7 +77,7 @@ def truncar(valor, casas=2):
 
 # Função para verificar resposta
 def verificar_resposta(valor_calculado, valor_digitado):
-    return "VERDE" if abs(valor_calculado - valor_digitado) < 0.1 else "VERMELHO"
+    return "VERDE" if abs(valor_calculado - valor_digitado) < 0.01 else "VERMELHO"
 
 # Layout principal
 if menu == "IMV" or menu == "IMT":
@@ -85,10 +105,9 @@ if menu == "IMV" or menu == "IMT":
         # Botão para gerar ou resetar valores
         if st.button("Gerar Valores"):
             if menu == "IMT":
-                 st.session_state[f"valores_{menu}"] = gerar_valores_automaticos(10, 30, rows, cols)
+                st.session_state[f"valores_{menu}"] = gerar_valores_automaticos(10, 30, rows, cols)
             elif menu == "IMV":
                 st.session_state[f"valores_{menu}"] = gerar_valores_automaticos(50, 80, rows, cols)
-
 
         # Recuperar os valores da tabela do estado da sessão
         valores = st.session_state[f"valores_{menu}"]
@@ -105,13 +124,66 @@ if menu == "IMV" or menu == "IMT":
         st.markdown("### Fórmula")
         st.latex(rf"{menu} = \frac{{\text{{{menu}}}}}{{\text{{POP}}}} \times 100.000")
 
-        st.markdown("### Cálculos")
-        for i, row in enumerate(rows):
-            valor_calculado = truncar((df.loc[row, menu] / populacao) * 100000, 2)
-            resposta_digitada = st.number_input(f"{menu} {row}:", min_value=0.0, format="%.2f", step=1.0, key=f"resposta_{row}")
-            status = verificar_resposta(valor_calculado, resposta_digitada)
-            st.markdown(f"Status: <span style='color:{status.lower()}'>{status}</span>", unsafe_allow_html=True)
-            #st.markdown(f"Valor Calculado (truncado): {valor_calculado:.2f}")
+        # Cálculos do IMV ou IMT
+        with st.expander("Cálculos do Indicador", expanded=True):
+            for i, row in enumerate(rows):
+                valor_calculado = truncar((df.loc[row, menu] / populacao) * 100000, 2)
+                resposta_digitada = st.number_input(
+                    f"{menu} {row}:",
+                    min_value=0.0,
+                    format="%.2f",
+                    step=0.01,
+                    key=f"resposta_{row}"
+                )
+                status = verificar_resposta(valor_calculado, resposta_digitada)
+
+                # Exibir valor com cor dinâmica
+                input_class = "correct-input" if status == "VERDE" else "incorrect-input"
+                st.markdown(
+                    f"<div class='{input_class}'>{resposta_digitada:.2f}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        # Cálculo da variação
+        with st.expander("Cálculo da Variação", expanded=True):
+            try:
+                # Verifica se os valores de 2022 e 2023 são válidos
+                if df.loc["2022", menu] > 0 and df.loc["2023", menu] > 0:
+                    # Calcula a variação entre 2023 e 2022 com truncamento
+                    variacao_calculada = truncar(((df.loc["2023", menu] - df.loc["2022", menu]) / df.loc["2022", menu]) * 100, 2)
+
+                    # Mostra a fórmula
+                    st.markdown("### Fórmula da Variação")
+                    st.latex(r"\text{Variação} = \frac{\text{2023} - \text{2022}}{\text{2022}} \times 100")
+
+                    # Campo para o aluno inserir a variação calculada
+                    variacao_digitada = st.number_input(
+                        "Digite a Variação Calculada (com 2 casas decimais):",
+                        min_value=-100.0,
+                        max_value=100.0,
+                        format="%.2f",
+                        step=0.01
+                    )
+
+                    # Verifica a resposta
+                    if abs(variacao_calculada - variacao_digitada) < 0.01:
+                        st.markdown(
+                            f"<span style='color:green;font-weight:bold;'>Status: CORRETO ✅</span>",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            f"<span style='color:red;font-weight:bold;'>Status: INCORRETO ❌</span>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.warning(
+                        "Os valores para 2022 e 2023 são 0 ou inválidos. Por favor, preencha os dados da tabela antes de calcular a variação."
+                    )
+            except KeyError as e:
+                st.error(f"Erro no cálculo da variação: {e}. Verifique os dados da tabela.")
+            except Exception as e:
+                st.error(f"Erro inesperado: {e}")
 
 # Tabela de ICCP
 elif menu == "ICCP":
