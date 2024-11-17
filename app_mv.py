@@ -60,7 +60,15 @@ table_style = """
 st.markdown(table_style, unsafe_allow_html=True)
 
 # Sidebar
+# Adicionando uma imagem no sidebar
+st.sidebar.image(
+    "C:/Repositorios_GitHube/MeusProjetos/Analise_CV/APM2.png", 
+    caption="Logo da Análise CV",  # Legenda opcional
+    use_column_width=True  # Ajusta automaticamente à largura do sidebar
+)
+
 st.sidebar.title("Menu de Indicadores")
+st.sidebar.markdown("# Menu de Indicadores")
 menu = st.sidebar.selectbox(
     "Escolha o Indicador:",
     ["Selecione", "IMV", "ICCP", "IMT"]
@@ -79,7 +87,7 @@ def truncar(valor, casas=2):
 def verificar_resposta(valor_calculado, valor_digitado):
     return "VERDE" if abs(valor_calculado - valor_digitado) < 0.01 else "VERMELHO"
 
-# Layout principal
+# Layout principal para IMV e IMT
 if menu == "IMV" or menu == "IMT":
     # Instruções
     st.title(f"Tabela de {menu}")
@@ -121,11 +129,12 @@ if menu == "IMV" or menu == "IMT":
 
     # Exibição de fórmula e cálculos
     with col2:
-        st.markdown("### Fórmula")
-        st.latex(rf"{menu} = \frac{{\text{{{menu}}}}}{{\text{{POP}}}} \times 100.000")
+        
 
         # Cálculos do IMV ou IMT
         with st.expander("Cálculos do Indicador", expanded=True):
+            st.markdown("### Fórmula")
+            st.latex(rf"{menu} = \frac{{\text{{{menu}}}}}{{\text{{POP}}}} \times 100.000")
             for i, row in enumerate(rows):
                 valor_calculado = truncar((df.loc[row, menu] / populacao) * 100000, 2)
                 resposta_digitada = st.number_input(
@@ -185,14 +194,141 @@ if menu == "IMV" or menu == "IMT":
             except Exception as e:
                 st.error(f"Erro inesperado: {e}")
 
-# Tabela de ICCP
-elif menu == "ICCP":
+if menu == "ICCP":
+    # Título e instruções
     st.title("Tabela de ICCP")
     st.markdown("**Formatação da tabela:**")
-    st.markdown("- Linhas: Natureza (Furto, Roubo, Extorsão)")
-    st.markdown("- Colunas: Anos (2021, 2022, 2023)")
+    st.markdown("- **Linhas:** Natureza (FURTO, ROUBO, EXTORSÃO)")
+    st.markdown("- **Colunas:** Anos (2021, 2022, 2023)")
 
-    # Espaço para personalização futura
-    st.markdown("**Área de cálculos será implementada posteriormente.**")
-else:
-    st.write("Selecione um indicador na barra lateral para começar.")
+    # Divisão da página
+    col1, col2 = st.columns([1, 1])  # Divisão da página em duas colunas
+
+    # Coluna 1: Entrada de População e Tabela de Valores
+    with col1:
+        # Entrada de População
+        populacao = st.number_input("Digite o valor da População (POP):", min_value=1, step=1, value=344355)
+
+        st.markdown("### Tabela de Valores")
+
+        # Configuração da tabela
+        rows = ["FURTO", "ROUBO", "EXTORSÃO"]
+        cols = ["2021", "2022", "2023"]
+
+        # Inicializar estado da sessão
+        if f"valores_ICCP" not in st.session_state:
+            st.session_state["valores_ICCP"] = None  # Inicializa como None para indicar que a tabela ainda não foi gerada
+
+        # Botão para gerar valores automáticos
+        if st.button("Gerar Tabela"):
+            valores = []
+            for row in rows:
+                if row == "FURTO":
+                    valores.append([random.randint(1012, 2015) for _ in range(len(cols))])
+                elif row == "ROUBO":
+                    valores.append([random.randint(80, 300) for _ in range(len(cols))])
+                elif row == "EXTORSÃO":
+                    valores.append([random.randint(5, 30) for _ in range(len(cols))])
+            st.session_state["valores_ICCP"] = valores
+
+        # Verificar se a tabela foi gerada
+        if st.session_state["valores_ICCP"] is not None:
+            # Recuperar valores da tabela
+            valores = st.session_state["valores_ICCP"]
+
+            # Criar DataFrame
+            df_iccp = pd.DataFrame(valores, index=rows, columns=cols)
+
+            # Exibir a tabela
+            st.markdown(df_iccp.to_html(classes="custom-table", index=True, escape=False), unsafe_allow_html=True)
+
+    # Coluna 2: Cálculos e Fórmulas
+    with col2:
+        # Verificar se a tabela foi gerada
+        if st.session_state["valores_ICCP"] is not None:
+            st.markdown("### Cálculos e Fórmulas")
+
+            # Cálculo do Fator FURTO/ROUBO
+            with st.expander("Cálculos do fator (F ∝ R)", expanded=True):
+                st.markdown("#### Cálculo do Fator F ∝ R")
+                fatores = {}
+                for ano_atual, ano_anterior in [("2022", "2021"), ("2023", "2022")]:
+                    try:
+                        furto = df_iccp.loc["FURTO", ano_anterior]
+                        roubo = df_iccp.loc["ROUBO", ano_anterior]
+
+                        if roubo > 0:
+                            fator_calculado = truncar(furto / roubo, 2)
+                            fatores[ano_atual] = fator_calculado
+                            fator_digitado = st.number_input(
+                                f"Digite o F ∝ R para {ano_atual} (baseado em {ano_anterior}):",
+                                min_value=0.0,
+                                format="%.2f",
+                                step=0.01,
+                                key=f"fator_{ano_atual}"
+                            )
+                            status_fator = verificar_resposta(fator_calculado, fator_digitado)
+                            input_class = "correct-input" if status_fator == "VERDE" else "incorrect-input"
+                            st.markdown(f"<div class='{input_class}'>{fator_digitado:.2f}</div>", unsafe_allow_html=True)
+                        else:
+                            st.warning(f"O valor de ROUBO em {ano_anterior} é zero. Não é possível calcular o fator para {ano_atual}.")
+                    except KeyError:
+                        st.error("Os valores necessários para o cálculo do fator não estão preenchidos.")
+                    except Exception as e:
+                        st.error(f"Erro ao calcular o Fator F ∝ R: {e}")
+
+            # Fórmula do ICCP
+            with st.expander("Cálculos do ICCP", expanded=True):
+                st.markdown("#### Fórmula do ICCP")
+                st.latex(r"""
+                    \text{ICCP} = \frac{{(\text{ROUBO} \cdot \text{F ∝ R}) + (\text{EXTORSÃO} \cdot \text{F ∝ R}) + \text{FURTO}}}{{\text{POP}}} \times 100
+                """)
+
+                # Cálculo do ICCP
+                for ano_atual, ano_anterior in [("2022", "2021"), ("2023", "2022")]:
+                    try:
+                        if ano_atual in fatores:
+                            fator = fatores[ano_atual]
+                            furto = df_iccp.loc["FURTO", ano_atual]
+                            roubo = df_iccp.loc["ROUBO", ano_atual]
+                            extorsao = df_iccp.loc["EXTORSÃO", ano_atual]
+
+                            iccp_calculado = truncar(((roubo * fator) + (extorsao * fator) + furto) / populacao * 100, 2)
+                            iccp_digitado = st.number_input(
+                                f"Digite o ICCP Calculado para {ano_atual}:",
+                                min_value=0.0,
+                                format="%.2f",
+                                step=0.01,
+                                key=f"iccp_{ano_atual}"
+                            )
+                            status_iccp = verificar_resposta(iccp_calculado, iccp_digitado)
+                            input_class = "correct-input" if status_iccp == "VERDE" else "incorrect-input"
+                            st.markdown(f"<div class='{input_class}'>{iccp_digitado:.2f}</div>", unsafe_allow_html=True)
+                    except KeyError:
+                        st.error("Os valores necessários para o cálculo do ICCP não estão preenchidos.")
+                    except Exception as e:
+                        st.error(f"Erro ao calcular o ICCP: {e}")
+
+            # Cálculo da Variação
+            with st.expander("Cálculo da Variação", expanded=True):
+                try:
+                    furto_2022 = df_iccp.loc["FURTO", "2022"]
+                    furto_2023 = df_iccp.loc["FURTO", "2023"]
+
+                    variacao_calculada = truncar(((furto_2023 - furto_2022) / furto_2022) * 100, 2)
+                    variacao_digitada = st.number_input(
+                        "Digite a variação calculada de FURTO (com 2 casas decimais):",
+                        min_value=-100.0,
+                        max_value=100.0,
+                        format="%.2f",
+                        step=0.01
+                    )
+                    status_variacao = verificar_resposta(variacao_calculada, variacao_digitada)
+                    input_class = "correct-input" if status_variacao == "VERDE" else "incorrect-input"
+                    st.markdown(f"<div class='{input_class}'>{variacao_digitada:.2f}</div>", unsafe_allow_html=True)
+                except KeyError:
+                    st.error("Os valores necessários para calcular a variação estão zerados ou inválidos.")
+                except Exception as e:
+                    st.error(f"Erro ao calcular a variação: {e}")
+        else:
+            st.warning("Por favor, gere a tabela antes de realizar cálculos.")
