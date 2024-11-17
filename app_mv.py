@@ -15,6 +15,29 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# CSS para tabelas responsivas
+responsive_table_style = """
+    <style>
+    .responsive-table {
+        margin: auto;
+        border-collapse: collapse;
+        width: auto;
+        max-width: 100%;
+        table-layout: fixed;
+    }
+    .responsive-table th, .responsive-table td {
+        border: 1px solid #ddd;
+        text-align: center;
+        padding: 8px;
+        width: 26mm; /* Largura inicial fixa */
+    }
+    .responsive-table th {
+        background-color: #f2f2f2;
+    }
+    </style>
+"""
+st.markdown(responsive_table_style, unsafe_allow_html=True)
+
 # Sidebar
 st.sidebar.title("Menu de Indicadores")
 menu = st.sidebar.selectbox(
@@ -25,6 +48,16 @@ menu = st.sidebar.selectbox(
 # Função para gerar valores automaticamente
 def gerar_valores_automaticos(min_val, max_val, rows, cols):
     return [[random.randint(min_val, max_val) for _ in range(len(cols))] for _ in range(len(rows))]
+
+# Função para exibir tabelas responsivas
+def exibir_tabela_responsiva(dataframe):
+    html_table = dataframe.to_html(
+        classes="responsive-table", 
+        index=True, 
+        justify="center", 
+        escape=False
+    )
+    st.markdown(html_table, unsafe_allow_html=True)
 
 # Tabela de IMV
 if menu == "IMV":
@@ -55,9 +88,9 @@ if menu == "IMV":
         # Geração automática de valores
         valores = gerar_valores_automaticos(50, 80, rows, cols)
 
-    # Mostrar a tabela
+    # Criar DataFrame
     df_imv = pd.DataFrame(valores, index=rows, columns=cols)
-    st.table(df_imv)
+    exibir_tabela_responsiva(df_imv)
 
 # Tabela de ICCP
 elif menu == "ICCP":
@@ -95,12 +128,12 @@ elif menu == "ICCP":
             elif row == "EXTORSÃO":
                 valores.append([random.randint(5, 30) for _ in range(len(cols))])
 
-    # Mostrar a tabela
+    # Criar DataFrame
     df_iccp = pd.DataFrame(valores, index=rows, columns=cols)
-    st.table(df_iccp)
+    exibir_tabela_responsiva(df_iccp)
 
-# Placeholder para "IMT" (não especificado ainda)
-if menu == "IMT":
+# Tabela de IMT
+elif menu == "IMT":
     st.title("Tabela de IMT")
     st.markdown("**Formatação da tabela:**")
     st.markdown("- Linhas: Anos (2022, 2023)")
@@ -128,10 +161,9 @@ if menu == "IMT":
         # Geração automática de valores
         valores = gerar_valores_automaticos(10, 30, rows, cols)
 
-    # Mostrar a tabela
-    df_imv = pd.DataFrame(valores, index=rows, columns=cols)
-    st.table(df_imv)
-
+    # Criar DataFrame
+    df_imt = pd.DataFrame(valores, index=rows, columns=cols)
+    exibir_tabela_responsiva(df_imt)
 
 # Mensagem padrão
 else:
